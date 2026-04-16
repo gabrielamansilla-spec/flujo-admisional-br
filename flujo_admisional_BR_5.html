@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flujo Admisional BR — PeopleOps</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f4f0; color: #2c2c2a; min-height: 100vh; }
+
+/* LOGIN (desactivado por defecto — reactivar para producción quitando display:none) */
+#login-screen { position: fixed; inset: 0; background: #f5f4f0; display: none; align-items: center; justify-content: center; z-index: 9999; }
+#login-screen.active { display: flex; }
+.login-card { background: #fff; border: 0.5px solid #d3d1c7; border-radius: 14px; padding: 36px 32px; width: 320px; text-align: center; }
+.login-card h2 { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+.login-card p { font-size: 12px; color: #888780; margin-bottom: 24px; }
+.login-card input { width: 100%; padding: 9px 12px; border-radius: 8px; border: 0.5px solid #d3d1c7; background: #f5f4f0; font-size: 14px; font-family: inherit; margin-bottom: 12px; }
+.login-card input:focus { outline: none; border-color: #5f5e5a; background: #fff; }
+.login-card button { width: 100%; padding: 9px; border-radius: 8px; border: none; background: #2c2c2a; color: #fff; font-size: 14px; font-family: inherit; cursor: pointer; }
+.login-card button:hover { background: #444441; }
+.login-error { font-size: 12px; color: #a32d2d; margin-top: 8px; display: none; }
+
+/* LAYOUT */
+header { background: #fff; border-bottom: 0.5px solid #d3d1c7; padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
+header h1 { font-size: 15px; font-weight: 500; }
+header span { font-size: 12px; color: #888780; }
+.tabs { display: flex; border-bottom: 0.5px solid #d3d1c7; background: #fff; padding: 0 32px; }
+.tab-btn { font-size: 13px; padding: 10px 18px; background: none; border: none; border-bottom: 2px solid transparent; color: #888780; cursor: pointer; font-family: inherit; transition: color .15s, border-color .15s; }
+.tab-btn.active { color: #2c2c2a; border-bottom-color: #2c2c2a; font-weight: 500; }
+.tab-btn:hover:not(.active) { color: #5f5e5a; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* LIST VIEW */
+.container { max-width: 960px; margin: 0 auto; padding: 28px 20px 60px; }
+.summary-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 24px; }
+.sum-card { background: #fff; border: 0.5px solid #d3d1c7; border-radius: 10px; padding: 12px 14px; }
+.sum-label { font-size: 11px; color: #888780; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.sum-val { font-size: 20px; font-weight: 500; }
+.sum-celonis { border-color: #1D9E75; }
+.sum-celonis .sum-val { color: #0F6E56; }
+.phase-block { margin-bottom: 24px; }
+.phase-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; }
+.phase-num { font-size: 11px; font-weight: 600; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.phase-title { font-size: 13px; font-weight: 500; }
+.phase-badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: rgba(255,255,255,.5); color: #5f5e5a; margin-left: auto; white-space: nowrap; }
+.connector-list { text-align: center; color: #b4b2a9; font-size: 20px; margin: 4px 0; }
+
+/* ACTIVITY CARD */
+.activity-card { background: #fff; border: 0.5px solid #d3d1c7; border-radius: 10px; padding: 0; margin-bottom: 10px; overflow: hidden; transition: border-color .15s; }
+.activity-card:hover { border-color: #888780; }
+.activity-card.celonis-connected { border-color: #1D9E75; }
+.activity-card.caso-uso { box-shadow: inset 3px 0 0 #7F77DD; }
+.act-header { display: flex; align-items: flex-start; gap: 8px; padding: 12px 14px; cursor: pointer; }
+.act-left { flex: 1; min-width: 0; }
+.act-name { font-weight: 500; font-size: 13px; }
+.act-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; align-items: center; }
+.act-source-tag { font-size: 11px; color: #5f5e5a; background: #f1efe8; padding: 2px 8px; border-radius: 99px; border: 0.5px solid #d3d1c7; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; border: 0.5px solid; }
+.badge-celonis { background: #e1f5ee; color: #0F6E56; border-color: #5dcaa5; }
+.badge-celonis-off { background: #f1efe8; color: #888780; border-color: #d3d1c7; }
+.badge-caso { background: #eeedfe; color: #534ab7; border-color: #afa9ec; }
+.badge-caso-off { background: #f1efe8; color: #888780; border-color: #d3d1c7; }
+.badge-qty { background: #f1efe8; color: #5f5e5a; border-color: #d3d1c7; }
+.act-toggle { font-size: 13px; color: #b4b2a9; margin-top: 2px; transition: transform .2s; user-select: none; flex-shrink: 0; }
+.act-toggle.open { transform: rotate(180deg); }
+.act-detail { display: none; padding: 0 14px 14px; border-top: 0.5px solid #e8e6df; }
+.act-detail.open { display: block; }
+.section-head { font-size: 11px; font-weight: 500; color: #888780; text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 8px; padding-bottom: 6px; border-bottom: 0.5px solid #e8e6df; display: flex; align-items: center; justify-content: space-between; }
+.field-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.field-label { font-size: 11px; color: #888780; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.field-input { width: 100%; font-size: 13px; padding: 7px 10px; border-radius: 7px; border: 0.5px solid #d3d1c7; background: #f5f4f0; color: #2c2c2a; resize: vertical; font-family: inherit; }
+.field-input:focus { outline: none; border-color: #5f5e5a; background: #fff; }
+.field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.toggle-wrap { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f5f4f0; border-radius: 8px; margin-bottom: 10px; }
+.toggle-label { font-size: 13px; color: #2c2c2a; flex: 1; }
+.toggle-desc { font-size: 11px; color: #888780; }
+.toggle-track { position: relative; width: 36px; height: 20px; background: #d3d1c7; border-radius: 10px; transition: background .2s; cursor: pointer; flex-shrink: 0; }
+.toggle-track.on { background: #1D9E75; }
+.toggle-track.on-purple { background: #7F77DD; }
+.toggle-thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: transform .2s; }
+.toggle-track.on .toggle-thumb, .toggle-track.on-purple .toggle-thumb { transform: translateX(16px); }
+.data-fields-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.df-row { background: #f5f4f0; border-radius: 8px; padding: 10px 12px; border: 0.5px solid #e8e6df; }
+.df-row-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+.df-name { font-size: 13px; font-weight: 500; color: #2c2c2a; }
+.df-type { font-size: 10px; padding: 2px 6px; border-radius: 99px; }
+.df-pk { font-size: 10px; padding: 2px 6px; border-radius: 99px; background: #faeeda; color: #854f0b; border: 0.5px solid #fac775; }
+.df-desc { font-size: 11px; color: #888780; margin-bottom: 3px; }
+.df-example { font-size: 11px; color: #5f5e5a; font-family: monospace; background: #fff; padding: 2px 6px; border-radius: 4px; border: 0.5px solid #d3d1c7; display: inline-block; }
+.df-del { margin-left: auto; font-size: 11px; color: #b4b2a9; cursor: pointer; padding: 2px 5px; border-radius: 4px; border: none; background: none; }
+.df-del:hover { color: #a32d2d; background: #fce8e8; }
+.add-df-form { background: #f5f4f0; border-radius: 8px; padding: 12px; margin-bottom: 8px; border: 0.5px dashed #d3d1c7; display: none; }
+.add-df-form.open { display: block; }
+.source-section { background: #f5f4f0; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.source-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.source-name-label { font-size: 12px; color: #888780; white-space: nowrap; }
+.systems-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.sys-badge { font-size: 11px; padding: 3px 9px; border-radius: 99px; border: 0.5px solid; }
+.sys-digibee    { background: #e6f1fb; color: #185fa5; border-color: #85b7eb; }
+.sys-unico      { background: #faeeda; color: #854f0b; border-color: #fac775; }
+.sys-sap        { background: #eaf3de; color: #3b6d11; border-color: #97c459; }
+.sys-jira       { background: #eeedfe; color: #534ab7; border-color: #afa9ec; }
+.sys-ssff       { background: #f0e8f8; color: #5a2a8a; border-color: #b07ad0; }
+.sys-santander  { background: #fce8e8; color: #a32d2d; border-color: #f09595; }
+.sys-esocial    { background: #e1f5ee; color: #0f6e56; border-color: #5dcaa5; }
+.sys-meliclick  { background: #f1efe8; color: #5f5e5a; border-color: #b4b2a9; }
+.btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.btn { font-size: 12px; padding: 6px 14px; border-radius: 7px; border: 0.5px solid #d3d1c7; background: transparent; color: #5f5e5a; cursor: pointer; font-family: inherit; }
+.btn:hover { background: #f1efe8; }
+.btn-danger { color: #a32d2d; border-color: #f09595; }
+.btn-danger:hover { background: #fce8e8; }
+.btn-primary { background: #2c2c2a; color: #fff; border-color: #2c2c2a; }
+.btn-primary:hover { background: #444441; }
+.btn-sm { font-size: 11px; padding: 4px 10px; }
+.btn-green { background: #e1f5ee; color: #0F6E56; border-color: #5dcaa5; }
+.btn-green:hover { background: #9FE1CB; }
+.add-btn { font-size: 12px; color: #888780; background: none; border: 0.5px dashed #d3d1c7; border-radius: 8px; padding: 7px 14px; cursor: pointer; width: 100%; margin-top: 4px; font-family: inherit; }
+.add-btn:hover { background: #f1efe8; color: #2c2c2a; }
+.type-string   { background: #f1efe8; color: #5f5e5a; border: 0.5px solid #d3d1c7; }
+.type-integer  { background: #e6f1fb; color: #185fa5; border: 0.5px solid #85b7eb; }
+.type-float    { background: #e6f1fb; color: #185fa5; border: 0.5px solid #85b7eb; }
+.type-date     { background: #eeedfe; color: #534ab7; border: 0.5px solid #afa9ec; }
+.type-datetime { background: #eeedfe; color: #534ab7; border: 0.5px solid #afa9ec; }
+.type-boolean  { background: #faeeda; color: #854f0b; border: 0.5px solid #fac775; }
+.type-id       { background: #fce8e8; color: #a32d2d; border: 0.5px solid #f09595; }
+
+/* DIAGRAM VIEW */
+.diagram-wrap { padding: 28px 20px 60px; overflow-x: auto; }
+.diagram-scroll { min-width: 960px; }
+.d-phases { display: flex; gap: 0; align-items: flex-start; }
+.d-phase { flex: 1; min-width: 200px; }
+.d-phase-head { padding: 10px 10px 8px; border-radius: 8px 8px 0 0; text-align: center; }
+.d-num { font-size: 10px; font-weight: 600; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+.d-name { font-size: 11px; font-weight: 500; line-height: 1.3; }
+.d-vol { font-size: 10px; margin-top: 3px; opacity: .7; }
+.d-acts { padding: 8px; display: flex; flex-direction: column; gap: 8px; border-radius: 0 0 8px 8px; }
+.d-act { background: #fff; border: 0.5px solid #d3d1c7; border-left-width: 2px; border-radius: 7px; padding: 8px 10px 8px 8px; position: relative; }
+.d-act-name { font-size: 11px; font-weight: 500; line-height: 1.3; padding-right: 24px; }
+.d-act-src { font-size: 10px; color: #888780; margin-top: 2px; }
+.d-act-qty { font-size: 10px; font-weight: 600; position: absolute; top: 6px; right: 6px; padding: 1px 5px; border-radius: 99px; }
+.d-sys-row { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 5px; }
+.d-sys { font-size: 10px; padding: 1px 5px; border-radius: 99px; border: 0.5px solid; }
+.d-caso-tag { font-size: 10px; margin-top: 4px; padding: 2px 6px; border-radius: 4px; background: #eeedfe; color: #534ab7; display: inline-block; }
+.d-act.celonis-on { background: #f0fbf7; border-color: #1D9E75; border-left-width: 3px; }
+.d-act.celonis-on .d-act-name { color: #0F6E56; }
+.celonis-header { display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
+.celonis-dot { width: 7px; height: 7px; border-radius: 50%; background: #1D9E75; flex-shrink: 0; }
+.celonis-label { font-size: 10px; font-weight: 600; color: #0F6E56; text-transform: uppercase; letter-spacing: .04em; }
+.d-data-fields { margin-top: 6px; border-top: 0.5px solid #9FE1CB; padding-top: 6px; }
+.d-df-item { font-size: 10px; color: #2c2c2a; padding: 3px 0; border-bottom: 0.5px solid #e1f5ee; }
+.d-df-item:last-child { border-bottom: none; }
+.d-df-label { color: #0F6E56; font-weight: 500; }
+.d-df-type-badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
+.d-df-pk-badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; background: #faeeda; color: #854f0b; margin-left: 3px; }
+.d-df-example { font-family: monospace; color: #888780; margin-left: 4px; }
+.d-arrow { display: flex; align-items: flex-start; padding-top: 48px; flex-shrink: 0; }
+.d-arrow-inner { width: 28px; text-align: center; color: #b4b2a9; font-size: 16px; }
+.d-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding: 14px 16px; background: #fff; border: 0.5px solid #d3d1c7; border-radius: 10px; }
+.d-legend-title { font-size: 11px; color: #888780; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; width: 100%; margin-bottom: 2px; }
+.d-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #5f5e5a; }
+.d-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* SPRINT TAB */
+.sprint-wrap { max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; }
+.sprint-toolbar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 20px; }
+.sprint-btn { font-size: 12px; padding: 6px 14px; border-radius: 7px; border: 0.5px solid #d3d1c7; background: transparent; color: #5f5e5a; cursor: pointer; font-family: inherit; }
+.sprint-btn:hover { background: #f1efe8; }
+.sprint-btn-primary { background: #2c2c2a; color: #fff; border-color: #2c2c2a; }
+.sprint-btn-primary:hover { background: #444441; }
+.sprint-hero { background: #2c2c2a; border-radius: 12px; padding: 24px 28px; margin-bottom: 24px; }
+.sprint-hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+.sprint-stat { background: rgba(255,255,255,.07); border-radius: 8px; padding: 10px 14px; }
+.sprint-stat-val { font-size: 20px; font-weight: 500; color: #fff; }
+.sprint-stat-label { font-size: 11px; color: #888780; margin-top: 2px; }
+.sprint-section { margin-bottom: 28px; }
+.sprint-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 0.5px solid #d3d1c7; }
+.sprint-section-title { font-size: 11px; font-weight: 500; color: #888780; text-transform: uppercase; letter-spacing: .06em; }
+.sprint-add-btn { font-size: 11px; padding: 3px 10px; border-radius: 6px; border: 0.5px dashed #d3d1c7; background: none; color: #888780; cursor: pointer; font-family: inherit; }
+.sprint-add-btn:hover { background: #f1efe8; color: #2c2c2a; }
+.sprint-edit-field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.sprint-edit-field label { font-size: 10px; color: #888780; text-transform: uppercase; letter-spacing: .04em; }
+.sprint-edit-field input, .sprint-edit-field textarea { width: 100%; font-size: 12px; padding: 6px 8px; border-radius: 6px; border: 0.5px solid #d3d1c7; background: #f5f4f0; color: #2c2c2a; font-family: inherit; resize: vertical; }
+.sprint-edit-field input:focus, .sprint-edit-field textarea:focus { outline: none; border-color: #5f5e5a; background: #fff; }
+.sprint-jornada { margin-bottom: 14px; }
+.sprint-jornada-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.sprint-bloque { background: #fff; border: 0.5px solid #d3d1c7; border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
+.sprint-bloque-head { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; cursor: pointer; }
+.sprint-bloque-head:hover { background: #f5f4f0; }
+.sprint-bloque-num { font-size: 11px; font-weight: 600; width: 20px; height: 20px; border-radius: 50%; background: #f1efe8; color: #5f5e5a; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.sprint-bloque-body-wrap { flex: 1; }
+.sprint-bloque-name-view { font-size: 13px; font-weight: 500; color: #2c2c2a; }
+.sprint-bloque-time-view { font-size: 11px; color: #888780; margin-top: 2px; }
+.sprint-bloque-tog { font-size: 12px; color: #b4b2a9; transition: transform .2s; }
+.sprint-bloque-tog.open { transform: rotate(180deg); }
+.sprint-bloque-detail { display: none; padding: 0 12px 12px 42px; border-top: 0.5px solid #e8e6df; }
+.sprint-bloque-detail.open { display: block; }
+.sprint-del-btn { font-size: 11px; color: #b4b2a9; background: none; border: none; cursor: pointer; padding: 0; margin-top: 8px; }
+.sprint-del-btn:hover { color: #a32d2d; }
+.pain-card { background: #fff; border: 0.5px solid #d3d1c7; border-left: 3px solid #d85a30; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.pain-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+.pain-severity-sel { font-size: 11px; padding: 2px 6px; border-radius: 99px; border: 0.5px solid #d3d1c7; background: #f5f4f0; color: #5f5e5a; cursor: pointer; font-family: inherit; }
+.caso-card { background: #fff; border: 0.5px solid #d3d1c7; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+.caso-header-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; }
+.caso-header-row:hover { background: #f5f4f0; }
+.caso-num-badge { font-size: 11px; font-weight: 600; width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.caso-c1 { background: #eeedfe; color: #534ab7; }
+.caso-c2 { background: #e1f5ee; color: #0f6e56; }
+.caso-c3 { background: #faeeda; color: #854f0b; }
+.caso-title-text { font-size: 13px; font-weight: 500; flex: 1; color: #2c2c2a; }
+.caso-tog { font-size: 12px; color: #b4b2a9; transition: transform .2s; }
+.caso-tog.open { transform: rotate(180deg); }
+.caso-body { display: none; padding: 12px 14px; border-top: 0.5px solid #e8e6df; }
+.caso-body.open { display: block; }
+.caso-metrica-pill { font-size: 12px; color: #0f6e56; background: #e1f5ee; padding: 5px 10px; border-radius: 6px; border: 0.5px solid #5dcaa5; margin-top: 4px; display: block; }
+.prio-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.prio-table th { font-size: 10px; font-weight: 500; color: #888780; text-transform: uppercase; letter-spacing: .04em; padding: 7px 10px; background: #f5f4f0; border: 0.5px solid #d3d1c7; text-align: left; }
+.prio-table td { padding: 7px 10px; border: 0.5px solid #d3d1c7; color: #2c2c2a; }
+.prio-table tr:hover td { background: #f5f4f0; }
+.prio-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
+.dot-g { background: #1D9E75; } .dot-y { background: #BA7517; } .dot-r { background: #993C1D; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 24px; right: 24px; background: #2c2c2a; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 9998; }
+.toast.show { opacity: 1; }
+
+@media (max-width: 700px) {
+  .summary-bar { grid-template-columns: repeat(2, 1fr); }
+  .container { padding: 16px 12px 60px; }
+  header { padding: 12px 16px; }
+  .tabs { padding: 0 12px; }
+  .field-grid-2 { grid-template-columns: 1fr; }
+  .sprint-hero-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media print {
+  header, .tabs, .sprint-toolbar, .sprint-add-btn, .sprint-del-btn, .sprint-bloque-tog, .caso-tog, .pain-severity-sel { display: none !important; }
+  .sprint-bloque-detail, .caso-body { display: block !important; }
+  .sprint-wrap { padding: 0; }
+  .sprint-hero { background: #2c2c2a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN (desactivado — para activar, agrega class="active" al div login-screen) -->
+<div id="login-screen">
+  <div class="login-card">
+    <h2>Flujo Admisional BR</h2>
+    <p>PeopleOps · Acceso restringido</p>
+    <input type="password" id="pwd-input" placeholder="Contraseña" onkeydown="if(event.key==='Enter')checkPwd()">
+    <button onclick="checkPwd()">Ingresar</button>
+    <div class="login-error" id="pwd-error">Contraseña incorrecta</div>
+  </div>
+</div>
+
+<header>
+  <h1>Flujo Admisional BR — PeopleOps</h1>
+  <span id="last-saved">Sin cambios guardados</span>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('list',this)">Lista de actividades</button>
+  <button class="tab-btn" onclick="switchTab('diagram',this)">Diagrama de flujo</button>
+  <button class="tab-btn" onclick="switchTab('sprint',this)">AI Design Sprint</button>
+</div>
+
+<div class="tab-pane active" id="tab-list">
+  <div class="container">
+    <div class="summary-bar" id="summary-bar"></div>
+    <div id="phases-container"></div>
+  </div>
+</div>
+
+<div class="tab-pane" id="tab-diagram">
+  <div class="diagram-wrap">
+    <div class="diagram-scroll">
+      <div class="d-phases" id="d-phases"></div>
+      <div class="d-legend" id="d-legend"></div>
+    </div>
+  </div>
+</div>
+
+<div class="tab-pane" id="tab-sprint">
+  <div class="sprint-wrap" id="sprint-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+let phases = [
+  { id:'p1', name:'Colecta de info y creación de perfil', color:'#7F77DD', activities:[
+    { id:'a1', name:'Completar formulario Meliclick', source:'Forms Meliclick', sourceConnectedCelonis:false, systems:['meliclick'], quantity:17, notes:'x17 formularios. Datos del candidato para creación de perfil. ⚠️ Particularidad Meliclick: a diferencia del proceso estándar, la validación de documentación y creación del usuario en Único pueden ocurrir de forma simultánea con la solicitud de alta, debido a restricciones de tiempo en el proceso de shipping.', casoDeUso:false, dataFields:[
+      { id:'df_mel1', name:'uid', type:'id', isPK:true, description:'ID único del nodo en Único (UUID v4). Clave primaria que identifica de forma inequívoca cada branch, departamento, organización o posición en el sistema Único.', example:'071380f7-1ee0-4b99-a2f3-296a4d9abfed' },
+      { id:'df_mel2', name:'name', type:'string', isPK:false, description:'Nombre del nodo tal como aparece en la interfaz de Único. Suele seguir el patrón "[Tipo] - [Ubicación] [Código] ([Alias])".', example:'3PL - Service Center (3PSC_MEL)' },
+      { id:'df_mel3', name:'parent_name', type:'string', isPK:false, description:'Nombre del nodo padre en la jerarquía organizacional de Único. Permite reconstruir el árbol de estructura organizativa (ej: Mercado Pago → EBA1 → CD Cajamar).', example:'Mercado Pago' },
+      { id:'df_mel4', name:'customFields.tradingName', type:'string', isPK:false, description:'Nombre comercial / Nome Fantasia del nodo. Coincide habitualmente con el campo name, pero puede contener variantes legales o comerciales del nombre.', example:'3PL - Service Center (3PSC_MEL)' },
+      { id:'df_mel5', name:'customFields.cnpj', type:'string', isPK:false, description:'CNPJ de la entidad legal asociada al nodo (formato brasileño: XX.XXX.XXX/XXXX-XX). Puede estar ausente si el nodo no tiene personería jurídica propia.', example:'03.007.331/0001-41' },
+      { id:'df_mel6', name:'customFields.email', type:'string', isPK:false, description:'Email de contacto del nodo o código de integración con otros sistemas (ej: EBA1, 3PSC_MEL). Valor libre según la implementación.', example:'3PSC_MEL' },
+      { id:'df_mel7', name:'customFields.state', type:'string', isPK:false, description:'Estado (Unidade Federativa) donde opera el nodo. Código de 2 letras (ISO 3166-2:BR), ej: SP, RJ, MG.', example:'SP' },
+      { id:'df_mel8', name:'extraction_date', type:'date', isPK:false, description:'Fecha en que se extrajo el registro desde la API de Único hacia el DWH de Celonis. Formato: YYYY-MM-DD.', example:'2026-04-15' },
+      { id:'df_mel9', name:'_CELONIS_CHANGE_DATE', type:'datetime', isPK:false, description:'Timestamp ISO 8601 que registra cuándo Celonis detectó un cambio en este registro. Usado para auditoría y procesamiento incremental.', example:'2026-04-15T16:32:54.896586Z' }
+    ] },
+    { id:'a2', name:'Creación masiva de perfiles en Único', source:'ABM', sourceConnectedCelonis:true, systems:['unico'], quantity:17, notes:'ABM convierte 17 forms a Excel central (Macros) para creación o ajuste de perfiles en Único y SSFF. Sources: unico_branches, unico_departments, unico_organizations, unico_positions. ⚠️ Posición en el flujo: Único sigue DESPUÉS de la carga en Saxes en la mayoría de los casos. La carga masiva implica 13 portlets con validaciones automáticas que pueden generar errores (ej: dirección demasiado larga). Cuando hay error, el proceso se detiene y el ticket Jira se marca como PENDING con nota.', casoDeUso:false, dataFields:[
+      { id:'df_unico1', name:'uid', type:'id', isPK:true, description:'UUID que identifica de forma única el nodo en Único. Es la clave primaria de todos los objetos de estructura organizativa (branches, departments, organizations, positions).', example:'b966ec86-ab70-4673-98f6-c3defe4cabf4' },
+      { id:'df_unico2', name:'name', type:'string', isPK:false, description:'Nombre visible del nodo en Único. Para branches incluye el código de site; para departments el área funcional; para positions el rol o cargo.', example:'CX CS Marketplace' },
+      { id:'df_unico3', name:'parent_name', type:'string', isPK:false, description:'Nombre del nodo inmediatamente superior en la jerarquía. Permite navegar el organigrama desde cualquier nivel hasta la organización raíz.', example:'Mercado Pago' },
+      { id:'df_unico4', name:'description', type:'string', isPK:false, description:'Texto descriptivo del nodo. Puede contener información legal adicional o notas de configuración (ej: "Não excluir - Teste IDPay").', example:'Mercado Livre' },
+      { id:'df_unico5', name:'customFields.tradingName', type:'string', isPK:false, description:'Nome Fantasia / nombre comercial del nodo. En branches, típicamente coincide con el nombre del site de operaciones.', example:'CD - Cajamar SP02 (CDCJ_EBA)' },
+      { id:'df_unico6', name:'customFields.cnpj', type:'string', isPK:false, description:'CNPJ de la entidad legal del nodo. Múltiples nodos pueden compartir el mismo CNPJ (ej: 03.007.331/0001-41 es el CNPJ corporativo de MercadoLibre Brasil).', example:'03.007.331/0001-41' },
+      { id:'df_unico7', name:'customFields.email', type:'string', isPK:false, description:'Email registrado en Único o código de integración usado para identificar el nodo en sistemas externos (ERP, WMS, etc.).', example:'EBA1' },
+      { id:'df_unico8', name:'customFields.state', type:'string', isPK:false, description:'Estado (UF) de la operación del nodo. Relevante para cálculos fiscales y asignación geográfica de empleados.', example:'SP' },
+      { id:'df_unico9', name:'customFields.brand', type:'string', isPK:false, description:'Metadatos de la imagen de marca asociada al nodo: path en el bucket, MIME type, tamaño en bytes y nombre de archivo.', example:'{"mime": "image/jpeg", "name": "Logo_Teste.jfif"}' },
+      { id:'df_unico10', name:'acc', type:'id', isPK:false, description:'ID de la cuenta (account) de Único a la que pertenece el nodo. Funciona como tenant ID en entornos multi-cuenta.', example:'b966ec86-ab70-4673-98f6-c3defe4cabf4' },
+      { id:'df_unico11', name:'code', type:'string', isPK:false, description:'Código alfanumérico del nodo según el catálogo de Único. Puede ser null para nodos sin código asignado. Ej: código de cost center SAP.', example:'40000700 IT IS Shipping Infrastructure' },
+      { id:'df_unico12', name:'extraction_date', type:'date', isPK:false, description:'Fecha de extracción del registro desde la API de Único hacia Celonis (YYYY-MM-DD).', example:'2026-04-15' },
+      { id:'df_unico13', name:'_CELONIS_CHANGE_DATE', type:'datetime', isPK:false, description:'Timestamp ISO 8601 que registra el último cambio detectado por el motor de CDC de Celonis. Usado para replicación incremental.', example:'2026-04-15T16:32:53.612838Z' }
+    ] },
+    { id:'a3', name:'Procesamiento email y ejecución API', source:'Digibee', sourceConnectedCelonis:true, systems:['digibee','unico'], quantity:1, notes:'Digibee procesa adjunto del email y ejecuta API.', casoDeUso:true,
+      dataFields:[
+        { id:'df1', name:'email_id', type:'id', isPK:true, description:'ID único del email procesado por Digibee. Clave primaria que permite rastrear cada transacción de email-to-API a lo largo del pipeline de integración.', example:'EMX-20240415-001' },
+        { id:'df2', name:'api_status', type:'string', isPK:false, description:'Estado de la respuesta retornada por la API de Único tras el procesamiento. Valores típicos: SUCCESS, ERROR, PENDING. Usado para monitoreo y alertas.', example:'SUCCESS' },
+        { id:'df3', name:'timestamp_proceso', type:'datetime', isPK:false, description:'Fecha y hora exacta en que Digibee ejecutó el procesamiento del email y llamó a la API de Único. Base para cálculo de SLA y detección de demoras.', example:'2024-04-15T09:32:00' }
+      ]
+    }
+  ]},
+  { id:'p2', name:'Subida de docs y validación para ingreso', color:'#BA7517', activities:[
+    { id:'a4', name:'Prueba de vida y documentación', source:'Candidato', sourceConnectedCelonis:false, systems:['unico'], quantity:9, notes:'+9 documentos vía celular o totem.', casoDeUso:true, dataFields:[] },
+    { id:'a5', name:'Check automático Receita Federal', source:'Único', sourceConnectedCelonis:true, systems:['unico'], quantity:1, notes:'Check automático con Receita Federal.', casoDeUso:true,
+      dataFields:[
+        { id:'df4', name:'cpf', type:'id', isPK:true, description:'CPF del candidato (Cadastro de Pessoa Física). Documento de identidad fiscal brasileño de 11 dígitos. Es la PK del check de Receita Federal y se usa para validar la elegibilidad de contratación.', example:'123.456.789-00' },
+        { id:'df5', name:'resultado_check', type:'boolean', isPK:false, description:'Resultado booleano de la validación ante la Receita Federal. TRUE = CPF válido y habilitado para contratación. FALSE = CPF inválido, bloqueado o con restricciones.', example:'true' },
+        { id:'df6', name:'fecha_check', type:'date', isPK:false, description:'Fecha en que se realizó el check automático ante la Receita Federal. Permite auditar la validación y cumplir requisitos regulatorios de registro de fecha de verificación.', example:'2024-04-15' }
+      ]
+    },
+    { id:'a6', name:'Follow-up candidatos pendientes', source:'Mesa de análisis Único', sourceConnectedCelonis:false, systems:['unico'], quantity:1, notes:'Mesa hace follow-up de candidatos que aún no subieron documentación, revisa y señala si está OK para contratar (status Archivado) en menos de 30 min. ⚠️ Existe un isulog con historial completo de información faltante: detalla nro de ticket Jira, dato faltante y TA responsable. Cuando falta info, el equipo informa al TA por chat y marca el ticket en Jira como PENDING con nota correspondiente.', casoDeUso:false, dataFields:[] }
+  ]},
+  { id:'p3', name:'Alta del candidato y ajuste de perfil', color:'#0F6E56', activities:[
+    { id:'a7', name:'Apertura de ticket en Jira para ALTA', source:'TA', sourceConnectedCelonis:true, systems:['jira','ssff'], quantity:1, notes:'TA solicita alta via bot de ABM → se genera ticket en Jira. Para proceso estándar (no shipping): el ticket contiene la info del candidato para cargar en Access/Saxes. ⚠️ Para SHIPPING: el ticket solo contiene un link a un Google Sheet con todos los datos personales necesarios. Los datos del candidato NO están en campos de Jira directamente. Volumen: +20.000 altas/mes en Brasil (14.000 en marzo). Frecuencia: hasta 3 veces por semana. Tablas SSFF: JobApplication, JobApplicationStatus, JobApplicationStatusAuditTrail, JobApplicationStatusLabel, JobApplicationInterview, JobApplicationAssessmentOrder, JobRequisition, JobRequisitionPosting, JobOffer, JobOfferApprover, OfferLetter, Candidate, EmpEmployment, EmpEmploymentTermination.', casoDeUso:true, dataFields:[
+      { id:'df_ja1', name:'jobApplicationId', type:'id', isPK:true, description:'ID único de la postulación en SAP SuccessFactors (JobApplication). Clave primaria que conecta candidato, requisición, entrevistas, ofertas y carta oferta.', example:'JA-BR-2024-00421' },
+      { id:'df_ja2', name:'candidateId', type:'id', isPK:false, description:'ID del candidato en SSFF (tabla Candidate). Identifica al postulante a través de todo su ciclo en el ATS, incluso en múltiples procesos simultáneos.', example:'CND-50001113' },
+      { id:'df_ja3', name:'jobRequisitionId', type:'id', isPK:false, description:'ID de la requisición de empleo (JobRequisition) que originó este proceso. Contiene datos del puesto: título, departamento, hiring manager, perfil requerido.', example:'REQ-BR-2024-00100' },
+      { id:'df_ja4', name:'applicationStatus', type:'string', isPK:false, description:'Estado actual de la postulación (JobApplicationStatus). Representa el paso en el pipeline de reclutamiento. Ej: OFFER_ACCEPTED, HIRED, REJECTED.', example:'OFFER_ACCEPTED' },
+      { id:'df_ja5', name:'statusChangeDate', type:'datetime', isPK:false, description:'Fecha y hora del último cambio de estado (JobApplicationStatusAuditTrail). Permite calcular el time-to-hire y detectar cuellos de botella por etapa.', example:'2024-04-14T10:30:00Z' },
+      { id:'df_ja6', name:'statusLabel', type:'string', isPK:false, description:'Etiqueta legible del estado de la postulación (JobApplicationStatusLabel). Versión display-friendly del código de estado para reportería.', example:'Oferta Aceptada' },
+      { id:'df_ja7', name:'interviewDate', type:'datetime', isPK:false, description:'Fecha, hora y modalidad de la entrevista (JobApplicationInterview). Puede haber múltiples registros por postulación (entrevista técnica, RRHH, gerencia).', example:'2024-04-10T14:00:00Z' },
+      { id:'df_ja8', name:'assessmentOrderId', type:'id', isPK:false, description:'ID de la orden de assessment/evaluación (JobApplicationAssessmentOrder). Referencia pruebas psicotécnicas o evaluaciones técnicas requeridas en el proceso.', example:'ASM-00837' },
+      { id:'df_ja9', name:'jobOfferId', type:'id', isPK:false, description:'ID de la oferta laboral generada (JobOffer). Contiene salario ofrecido, fecha de inicio propuesta, beneficios y condiciones contractuales.', example:'JOF-BR-2024-00350' },
+      { id:'df_ja10', name:'offerApproverId', type:'id', isPK:false, description:'ID del aprobador de la oferta (JobOfferApprover). Registra el flujo de aprobaciones requeridas antes de enviar la oferta al candidato.', example:'MGR-12150' },
+      { id:'df_ja11', name:'offerLetterId', type:'id', isPK:false, description:'ID de la carta oferta enviada al candidato (OfferLetter). Documento formal que el candidato debe firmar para confirmar su aceptación.', example:'OL-BR-2024-00350' },
+      { id:'df_ja12', name:'postingId', type:'id', isPK:false, description:'ID de la publicación del puesto (JobRequisitionPosting). Registra en qué portales/canales se publicó la vacante y por cuánto tiempo.', example:'POST-BR-2024-00100' },
+      { id:'df_ja13', name:'startDate', type:'date', isPK:false, description:'Fecha de inicio confirmada en la oferta aceptada. Corresponde al primer día laboral del candidato y dispara el proceso de alta en sistemas.', example:'2024-04-16' },
+      { id:'df_ja14', name:'empEmploymentId', type:'id', isPK:false, description:'ID del registro de empleo creado en SSFF (EmpEmployment). Une el registro de reclutamiento con el de empleado activo, cerrando el ciclo hire-to-retire.', example:'824' },
+      { id:'df_ja15', name:'terminationDate', type:'date', isPK:false, description:'Fecha de terminación del empleo si aplica (EmpEmploymentTermination). 9999-12-31 indica empleado activo. Permite filtrar bajas para análisis de rotación.', example:'9999-12-31' }
+    ] },
+    { id:'a8', name:'Ajuste masivo de perfiles en Único', source:'ABM', sourceConnectedCelonis:false, systems:['unico'], quantity:1, notes:'Masivo ajuste perfiles Único. ⚠️ Desafío rehire: el sistema no permite recontratar directamente, por lo que el equipo accede al perfil anterior en Saxes y modifica un dato del CPF para ingresar como nueva contratación. Esto impide vincular usuarios con distinto username al mismo documento en Saxes (regla ligada a réplica SAP y número de seguridad social).', casoDeUso:false, dataFields:[] },
+    { id:'a9', name:'Procesamiento email y ejecución API', source:'Digibee', sourceConnectedCelonis:true, systems:['digibee','unico'], quantity:1, notes:'Digibee ejecuta API de ajuste.', casoDeUso:true,
+      dataFields:[
+        { id:'df7', name:'perfil_id', type:'id', isPK:true, description:'ID del perfil del candidato/empleado en Único. Clave primaria usada por Digibee para identificar el registro a actualizar en la API de ajuste masivo de perfiles.', example:'UNI-00423' },
+        { id:'df8', name:'tipo_ajuste', type:'string', isPK:false, description:'Tipo de operación ejecutada por la API de Único. Valores posibles: UPDATE_PROFILE, CREATE_PROFILE, DEACTIVATE_PROFILE. Define el impacto de la transacción Digibee.', example:'UPDATE_PROFILE' }
+      ]
+    },
+    { id:'a10', name:'Creación de perfiles en SSFF', source:'SAP SuccessFactors', sourceConnectedCelonis:true, systems:['ssff'], quantity:13, notes:'x13 perfiles creados en SSFF. Tabla: SFOData.EmpEmployment (API SuccessFactors OData v2).', casoDeUso:true, dataFields:[
+      { id:'df_ssff1', name:'personIdExternal', type:'id', isPK:true, description:'ID externo de la persona en SSFF (personIdExternal). Es la clave de integración con sistemas externos como SAP HCM, ECP o nómina. Equivale al PERNR en SAP.', example:'50001113' },
+      { id:'df_ssff2', name:'userId', type:'id', isPK:true, description:'ID de usuario en SAP SuccessFactors (userId). Identificador interno del sistema SSFF, distinto del personIdExternal. Ambos son PKs compuestos del registro.', example:'10171' },
+      { id:'df_ssff3', name:'employmentId', type:'id', isPK:false, description:'ID único del registro de empleo en SSFF (employmentId). Permite tener múltiples empleos para una misma persona (ej: rehire, contrato paralelo).', example:'824' },
+      { id:'df_ssff4', name:'startDate', type:'date', isPK:false, description:'Fecha de inicio del empleo actual en SSFF. Puede diferir del originalStartDate si el empleado fue recontratado o cambió de posición.', example:'2005-11-01' },
+      { id:'df_ssff5', name:'endDate', type:'date', isPK:false, description:'Fecha de fin del empleo. Valor 9999-12-31 o fecha futura indica empleado activo. Fecha pasada indica empleado dado de baja.', example:'2025-05-05' },
+      { id:'df_ssff6', name:'originalStartDate', type:'date', isPK:false, description:'Fecha en que el empleado comenzó por primera vez en la empresa. Se mantiene estable incluso ante rehires o cambios de posición.', example:'2005-11-01' },
+      { id:'df_ssff7', name:'lastDateWorked', type:'date', isPK:false, description:'Último día trabajado registrado en SSFF. Relevante para cálculos de liquidación y para distinguir bajas de vacaciones/licencias.', example:'2025-05-05' },
+      { id:'df_ssff8', name:'createdDateTime', type:'datetime', isPK:false, description:'Fecha y hora de creación del registro de empleo en SSFF. Corresponde al momento en que se procesó el alta en el sistema.', example:'2014-02-22T16:05:02Z' },
+      { id:'df_ssff9', name:'lastModifiedDateTime', type:'datetime', isPK:false, description:'Fecha y hora de la última modificación del registro. Útil para detección de cambios y replicación incremental hacia Celonis.', example:'2025-05-05T20:27:23Z' },
+      { id:'df_ssff10', name:'assignmentClass', type:'string', isPK:false, description:'Clasificación del tipo de asignación. ST = Standard (empleado regular). Otros valores indican contratos especiales (temporario, global assignment, etc.).', example:'ST' },
+      { id:'df_ssff11', name:'okToRehire', type:'boolean', isPK:false, description:'Indicador booleano que señala si el empleado puede ser recontratado. TRUE = elegible para rehire. FALSE = inhabilitado para futuros contratos.', example:'TRUE' },
+      { id:'df_ssff12', name:'lastModifiedBy', type:'string', isPK:false, description:'Usuario o proceso que realizó la última modificación del registro. SFAPI_EXTENSION_SSFF indica modificación automática vía API de integración.', example:'SFAPI_EXTENSION_SSFF' },
+      { id:'df_ssff13', name:'customString1', type:'string', isPK:false, description:'Campo custom 1 de uso interno de Meli en SSFF. Puede almacenar categoría de performance, nivel de seniority u otros atributos del empleado.', example:'Role Model' },
+      { id:'df_ssff14', name:'customString2', type:'string', isPK:false, description:'Campo custom 2 de uso interno. Suele contener un número de referencia interno o código de integración con otro sistema.', example:'1.00011663862806E14' },
+      { id:'df_ssff15', name:'customString90', type:'string', isPK:false, description:'Campo custom 90 de uso interno. Corresponde a un código de clasificación interna (ej: código de área, cost center, o categoría organizacional).', example:'21739' },
+      { id:'df_ssff16', name:'customString91', type:'string', isPK:false, description:'Campo custom 91 de uso interno. Similar al custom 90, puede representar una subclasificación o categoría complementaria.', example:'22205' },
+      { id:'df_ssff17', name:'customLong1', type:'integer', isPK:false, description:'Campo numérico largo 1. Puede contener el ID del manager directo (managerId) u otro identificador numérico relacionado con el empleado.', example:'10171' },
+      { id:'df_ssff18', name:'payrollEndDate', type:'date', isPK:false, description:'Fecha de fin del período de nómina. Usada para sincronización con el sistema de payroll.', example:'2025-05-05' },
+      { id:'df_ssff19', name:'bonusPayExpirationDate', type:'date', isPK:false, description:'Fecha de expiración de los beneficios de bono del empleado. Relevante para el módulo de compensación variable.', example:'2025-06-17' }
+    ] }
+  ]},
+  { id:'p4', name:'Firma de contrato y alta en entidades', color:'#993C1D', activities:[
+    { id:'a11', name:'Firma de contrato y documentos', source:'Candidato', sourceConnectedCelonis:false, systems:['unico'], quantity:11, notes:'Candidato firma 11 formularios.', casoDeUso:true, dataFields:[] },
+    { id:'a12', name:'Envío de forms para firma (SAP / Único)', source:'Único', sourceConnectedCelonis:true, systems:['unico','sap'], quantity:1, notes:'Envío de forms vía API. Integración Único>SAP.', casoDeUso:true,
+      dataFields:[
+        { id:'df9', name:'contrato_id', type:'id', isPK:true, description:'ID único del contrato generado en Único para la firma electrónica. Clave primaria que vincula la carta oferta, los formularios de firma y los datos de integración con SAP.', example:'CTR-2024-BR-1042' },
+        { id:'df10', name:'estado_firma', type:'string', isPK:false, description:'Estado del proceso de firma del contrato en Único. Valores: PENDENTE, FIRMADO, RECHAZADO, EXPIRADO. Controla el flujo de avance al alta definitiva en SAP.', example:'FIRMADO' },
+        { id:'df11', name:'fecha_firma', type:'datetime', isPK:false, description:'Timestamp exacto en que el candidato firmó electrónicamente el contrato en Único. Tiene valor legal y activa el proceso de alta en SAP y sistemas downstream.', example:'2024-04-15T14:22:00' }
+      ]
+    },
+    { id:'a13', name:'Alta en SAP y sistemas downstream', source:'SAP / Strada', sourceConnectedCelonis:true, systems:['sap'], quantity:1, notes:'Alta en SAP, beneficios, eSocial, ponto.', casoDeUso:true,
+      dataFields:[
+        { id:'df12', name:'employee_id', type:'id', isPK:true, description:'ID del empleado en SAP HCM/ECP (equivale al PERNR). Clave primaria en SAP que identifica al trabajador en todos los infotipos: nómina, beneficios, estructura organizativa, asistencia.', example:'SAP-BR-09821' },
+        { id:'df13', name:'fecha_alta', type:'date', isPK:false, description:'Fecha efectiva de alta del empleado en SAP. Primer día laboral contractual. Define la fecha desde la que se calculan derechos laborales, beneficios y nómina.', example:'2024-04-16' },
+        { id:'df14', name:'beneficios_ok', type:'boolean', isPK:false, description:'Confirmación booleana de que el alta en los sistemas de beneficios (Wellhub, Sodexo, etc.) se completó correctamente. TRUE = todos los sistemas de beneficios actualizados.', example:'true' },
+        { id:'df_ecp1', name:'ENDDA', type:'date', isPK:false, description:'Fecha de fin de vigencia del infotipo PA0000 en SAP ECP (End Date). El valor 9999-12-31 indica registro activo sin fecha de vencimiento. Clave de delimitación temporal en el modelo SAP.', example:'9999-12-31' },
+        { id:'df_ecp2', name:'BEGDA', type:'date', isPK:false, description:'Fecha de inicio de vigencia del infotipo PA0000 en SAP ECP (Start Date). Junto con ENDDA define el período de validez de cada acción de personal.', example:'2024-04-16' },
+        { id:'df_ecp3', name:'AEDTM', type:'date', isPK:false, description:'Fecha de la última modificación del registro en SAP ECP (Changed On). Campo nativo SAP, distinto de AUD_UPD_DTTM que es auditoría del DWH.', example:'2024-04-16' },
+        { id:'df_ecp4', name:'AUD_INS_DTTM', type:'datetime', isPK:false, description:'Timestamp de inserción del registro en la capa destino del DWH/ETL (campo de auditoría). No es un campo SAP estándar; lo genera el pipeline de Celonis/ETL al ingestar el dato.', example:'2024-04-16T09:32:00' },
+        { id:'df_ecp5', name:'AUD_UPD_DTTM', type:'datetime', isPK:false, description:'Timestamp de la última actualización del registro en la capa destino del DWH/ETL (campo de auditoría). Permite identificar cuándo se replicó por última vez el dato desde ECP.', example:'2024-04-16T14:22:00' },
+        { id:'df_ecp6', name:'PERNR', type:'id', isPK:true, description:'Número de personal SAP (Personnel Number). Clave primaria del infotipo PA0000 en ECP. Equivale al personIdExternal de SSFF. Identifica al empleado en todo el ecosistema SAP HCM.', example:'30001293' },
+        { id:'df_ecp7', name:'MASSN', type:'string', isPK:false, description:'Tipo/Código de acción de personal en SAP (Action Type). Define qué evento se registró: alta (01), baja (10), cambio organizacional (15), rehire (52), etc. Cluster 2 de la tabla.', example:'01' },
+        { id:'df_ecp8', name:'MASSG', type:'string', isPK:false, description:'Motivo de la acción de personal (Reason for Action). Complementa a MASSN especificando la causa: renuncia voluntaria, fin de contrato, transferencia, etc.', example:'01' },
+        { id:'df_ecp9', name:'SUBTY', type:'string', isPK:false, description:'Subtipo del infotipo PA0000. En este infotipo suele ser vacío o "0". Cluster 1 de la tabla. Permite subdividir registros dentro del mismo infotipo.', example:'0' },
+        { id:'df_ecp10', name:'STAT2', type:'string', isPK:false, description:'Estatus de empleo del trabajador en SAP. Valores comunes: 0 = retirado, 1 = pensionado, 2 = baja temporal, 3 = activo. Crítico para filtrar empleados vigentes.', example:'3' },
+        { id:'df_ecp11', name:'UNAME', type:'string', isPK:false, description:'Usuario SAP que creó o modificó el registro en ECP. SFAPI_EXTENSION_SSFF indica procesamiento automático vía API de integración SSFF↔ECP.', example:'SFAPI_EXTENSION_SSFF' },
+        { id:'df_ecp12', name:'MANDT', type:'string', isPK:false, description:'Mandante SAP (Client). Identifica el entorno SAP (producción, QA, desarrollo). En producción Brasil suele ser 200. Relevante para ambientes multi-mandante.', example:'200' }
+      ]
+    },
+    { id:'a14', name:'Pedido cuenta bancaria Santander', source:'SAP', sourceConnectedCelonis:false, systems:['santander'], quantity:1, notes:'Integración SAP > Santander.', casoDeUso:false, dataFields:[] },
+    { id:'a15', name:'Alta eSocial', source:'SAP', sourceConnectedCelonis:false, systems:['esocial'], quantity:1, notes:'Alta en eSocial desde SAP.', casoDeUso:false, dataFields:[] }
+  ]}
+];
+
+// ── UTILS ──
+function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function uid() { return 'x'+Date.now()+Math.floor(Math.random()*1000); }
+function totalActs() { return phases.reduce((s,p)=>s+p.activities.length,0); }
+function totalQty() { return phases.reduce((s,p)=>s+p.activities.reduce((a,ac)=>a+(ac.quantity||0),0),0); }
+function totalCelonis() { return phases.reduce((s,p)=>s+p.activities.filter(a=>a.sourceConnectedCelonis).length,0); }
+function totalCasoUso() { return phases.reduce((s,p)=>s+p.activities.filter(a=>a.casoDeUso).length,0); }
+function allSysCount() { const s=new Set(); phases.forEach(p=>p.activities.forEach(a=>a.systems.forEach(x=>s.add(x)))); return s.size; }
+function typeClass(t) { return 'type-'+(t||'string'); }
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name==='diagram') renderDiagram();
+  if (name==='sprint' && !document.getElementById('sprint-content').dataset.rendered) renderSprint();
+}
+
+const PASSWORD = "peopleops2025";
+function checkPwd() {
+  if (document.getElementById('pwd-input').value === PASSWORD) {
+    document.getElementById('login-screen').classList.remove('active');
+  } else {
+    document.getElementById('pwd-error').style.display = 'block';
+    document.getElementById('pwd-input').value = '';
+    document.getElementById('pwd-input').focus();
+  }
+}
+
+const sysLabels = { digibee:'Digibee', unico:'Único', sap:'SAP', jira:'Jira', ssff:'SuccessFactors', santander:'Santander', esocial:'eSocial', meliclick:'Meliclick' };
+const dataTypeOptions = ['string','integer','float','date','datetime','boolean','id'];
+
+function showToast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function uid() { return 'x'+Date.now()+Math.floor(Math.random()*1000); }
+function totalActs() { return phases.reduce((s,p)=>s+p.activities.length,0); }
+function totalQty() { return phases.reduce((s,p)=>s+p.activities.reduce((a,ac)=>a+(ac.quantity||0),0),0); }
+function totalCelonis() { return phases.reduce((s,p)=>s+p.activities.filter(a=>a.sourceConnectedCelonis).length,0); }
+function totalCasoUso() { return phases.reduce((s,p)=>s+p.activities.filter(a=>a.casoDeUso).length,0); }
+function allSysCount() { const s=new Set(); phases.forEach(p=>p.activities.forEach(a=>a.systems.forEach(x=>s.add(x)))); return s.size; }
+function typeClass(t) { return 'type-'+(t||'string'); }
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name==='diagram') renderDiagram();
+  if (name==='sprint' && !document.getElementById('sprint-content').dataset.rendered) renderSprint();
+}
+
+// ── SUMMARY ──
+function renderSummary() {
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="sum-card"><div class="sum-label">Fases</div><div class="sum-val">${phases.length}</div></div>
+    <div class="sum-card"><div class="sum-label">Actividades</div><div class="sum-val">${totalActs()}</div></div>
+    <div class="sum-card"><div class="sum-label">Volumen total</div><div class="sum-val">${totalQty()}</div></div>
+    <div class="sum-card sum-celonis"><div class="sum-label">En Celonis</div><div class="sum-val">${totalCelonis()}</div></div>
+    <div class="sum-card"><div class="sum-label">Caso de uso</div><div class="sum-val">${totalCasoUso()}</div></div>`;
+}
+
+// ── LIST RENDER ──
+function renderPhases() {
+  const c = document.getElementById('phases-container');
+  c.innerHTML = '';
+  phases.forEach((phase, pi) => {
+    const vol = phase.activities.reduce((s,a)=>s+(a.quantity||0),0);
+    const block = document.createElement('div');
+    block.className = 'phase-block';
+    block.innerHTML = `
+      <div class="phase-header" style="background:${phase.color}18;border-left:3px solid ${phase.color}">
+        <div class="phase-num" style="background:${phase.color}22;color:${phase.color}">${pi+1}</div>
+        <span class="phase-title" style="color:${phase.color}">${phase.name}</span>
+        <span class="phase-badge">${phase.activities.length} actividades · vol. ${vol}</span>
+      </div>
+      <div id="acts-${phase.id}"></div>
+      <button class="add-btn" onclick="addActivity('${phase.id}')">+ Nueva actividad</button>`;
+    c.appendChild(block);
+    renderActivities(phase);
+    if (pi < phases.length-1) { const conn=document.createElement('div'); conn.className='connector-list'; conn.textContent='↓'; c.appendChild(conn); }
+  });
+}
+
+function renderActivities(phase) {
+  const c = document.getElementById('acts-'+phase.id);
+  c.innerHTML = '';
+  phase.activities.forEach(act => {
+    const card = document.createElement('div');
+    card.className = 'activity-card' + (act.sourceConnectedCelonis?' celonis-connected':'') + (act.casoDeUso?' caso-uso':'');
+    card.id = 'card-'+act.id;
+    const sysBadges = act.systems.map(s=>`<span class="sys-badge sys-${s}">${sysLabels[s]||s}</span>`).join('');
+    const dfCount = act.dataFields.length;
+    card.innerHTML = `
+      <div class="act-header" onclick="toggleCard('${act.id}')">
+        <div class="act-left">
+          <div class="act-name">${act.name}</div>
+          <div class="act-meta">
+            <span class="act-source-tag">${act.source}</span>
+            <span class="badge badge-qty">×${act.quantity}</span>
+            <span class="badge ${act.sourceConnectedCelonis?'badge-celonis':'badge-celonis-off'}">${act.sourceConnectedCelonis?'✓ Celonis':'Celonis'}</span>
+            <span class="badge ${act.casoDeUso?'badge-caso':'badge-caso-off'}">${act.casoDeUso?'✓ Caso de uso':'Caso de uso'}</span>
+            ${dfCount?`<span class="badge" style="background:#f5f4f0;color:#888780;border-color:#d3d1c7">${dfCount} campo${dfCount>1?'s':''}</span>`:''}
+            ${sysBadges}
+          </div>
+        </div>
+        <div class="act-toggle" id="toggle-${act.id}">▾</div>
+      </div>
+      <div class="act-detail" id="detail-${act.id}">
+        ${buildActivityDetail(phase, act)}
+      </div>`;
+    c.appendChild(card);
+  });
+}
+
+function buildActivityDetail(phase, act) {
+  const sysBadges = act.systems.map(s=>`<span class="sys-badge sys-${s}">${sysLabels[s]||s}</span>`).join('');
+  const dfRows = (act.dataFields||[]).map(df=>`
+    <div class="df-row" id="dfrow-${df.id}">
+      <div class="df-row-head">
+        <span class="df-name">${df.name}</span>
+        <span class="df-type ${typeClass(df.type)}">${df.type}</span>
+        ${df.isPK?'<span class="df-pk">PK</span>':''}
+        <button class="df-del" onclick="deleteDataField('${phase.id}','${act.id}','${df.id}')">✕</button>
+      </div>
+      ${df.description?`<div class="df-desc">${df.description}</div>`:''}
+      ${df.example?`<span class="df-example">${df.example}</span>`:''}
+    </div>`).join('');
+
+  return `
+    <div class="section-head" style="margin-top:12px">Información general</div>
+    <div class="field-grid-2">
+      <div class="field-row"><div class="field-label">Nombre de actividad</div>
+        <input class="field-input" type="text" value="${act.name}" oninput="setField('${phase.id}','${act.id}','name',this.value)"></div>
+      <div class="field-row"><div class="field-label">Cantidad / Volumen</div>
+        <input class="field-input" type="number" min="0" value="${act.quantity}" oninput="setField('${phase.id}','${act.id}','quantity',parseInt(this.value)||0)"></div>
+    </div>
+    <div class="field-row"><div class="field-label">Notas / Descripción</div>
+      <textarea class="field-input" rows="3" oninput="setField('${phase.id}','${act.id}','notes',this.value)">${act.notes||''}</textarea></div>
+    <div class="field-row"><div class="field-label">Sistemas</div>
+      <div class="systems-row">${sysBadges}</div>
+      <input class="field-input" type="text" value="${act.systems.join(', ')}" placeholder="digibee, unico, sap..." style="margin-top:6px" oninput="setSystems('${phase.id}','${act.id}',this.value)"></div>
+    <div class="section-head">Source</div>
+    <div class="source-section">
+      <div class="source-name-row">
+        <span class="source-name-label">Nombre del source:</span>
+        <input class="field-input" type="text" value="${act.source}" oninput="setField('${phase.id}','${act.id}','source',this.value)" style="flex:1">
+      </div>
+      <div class="toggle-wrap">
+        <div><div class="toggle-label">Conectado en Celonis</div><div class="toggle-desc">¿Este source tiene conexión activa en Celonis?</div></div>
+        <div class="toggle-track ${act.sourceConnectedCelonis?'on':''}" id="cel-track-${act.id}" onclick="toggleCelonis('${phase.id}','${act.id}')"><div class="toggle-thumb"></div></div>
+      </div>
+    </div>
+    <div class="section-head">Caso de uso</div>
+    <div class="toggle-wrap">
+      <div><div class="toggle-label">Entra para el caso de uso</div><div class="toggle-desc">¿Esta actividad es parte del caso de uso a modelar?</div></div>
+      <div class="toggle-track ${act.casoDeUso?'on-purple':''}" id="caso-track-${act.id}" onclick="toggleCasoUso('${phase.id}','${act.id}')"><div class="toggle-thumb"></div></div>
+    </div>
+    <div class="section-head">
+      Campos de datos
+      <button class="btn btn-sm btn-green" onclick="toggleAddDFForm('${act.id}')">+ Agregar campo</button>
+    </div>
+    <div id="df-list-${act.id}" class="data-fields-list">${dfRows||'<span style="font-size:12px;color:#b4b2a9">Sin campos de datos aún.</span>'}</div>
+    <div class="add-df-form" id="adf-form-${act.id}">
+      <div class="field-grid-2">
+        <div><div class="field-label">Nombre del campo</div><input class="field-input" id="adf-name-${act.id}" type="text" placeholder="Ej: employee_id, cpf"></div>
+        <div><div class="field-label">Tipo de dato</div><select class="field-input" id="adf-type-${act.id}">${dataTypeOptions.map(t=>`<option value="${t}">${t}</option>`).join('')}</select></div>
+        <div><div class="field-label">Descripción</div><input class="field-input" id="adf-desc-${act.id}" type="text" placeholder="¿Para qué sirve este campo?"></div>
+        <div><div class="field-label">Ejemplo de dato</div><input class="field-input" id="adf-ex-${act.id}" type="text" placeholder="Ej: SAP-BR-0001"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="toggle-track" id="adf-pk-track-${act.id}" onclick="this.classList.toggle('on');this.dataset.pk=this.classList.contains('on')?'1':'0'"><div class="toggle-thumb"></div></div>
+        <span style="font-size:13px;color:#2c2c2a">Es clave primaria (PK)</span>
+      </div>
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn btn-primary btn-sm" onclick="confirmAddDF('${phase.id}','${act.id}')">Guardar campo</button>
+        <button class="btn btn-sm" onclick="toggleAddDFForm('${act.id}')">Cancelar</button>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveAct('${phase.id}','${act.id}')">Guardar cambios</button>
+      <button class="btn btn-danger" onclick="deleteAct('${phase.id}','${act.id}')">Eliminar actividad</button>
+    </div>`;
+}
+
+// ── TOGGLES ──
+function toggleCard(actId) {
+  document.getElementById('detail-'+actId).classList.toggle('open');
+  document.getElementById('toggle-'+actId).classList.toggle('open');
+}
+function toggleCelonis(phaseId, actId) {
+  const act = getAct(phaseId, actId);
+  act.sourceConnectedCelonis = !act.sourceConnectedCelonis;
+  document.getElementById('cel-track-'+actId).classList.toggle('on', act.sourceConnectedCelonis);
+  document.getElementById('card-'+actId).classList.toggle('celonis-connected', act.sourceConnectedCelonis);
+  renderSummary();
+}
+function toggleCasoUso(phaseId, actId) {
+  const act = getAct(phaseId, actId);
+  act.casoDeUso = !act.casoDeUso;
+  document.getElementById('caso-track-'+actId).classList.toggle('on-purple', act.casoDeUso);
+  document.getElementById('card-'+actId).classList.toggle('caso-uso', act.casoDeUso);
+  renderSummary();
+}
+function toggleAddDFForm(actId) {
+  const form = document.getElementById('adf-form-'+actId);
+  form.classList.toggle('open');
+  if (form.classList.contains('open')) document.getElementById('adf-name-'+actId).focus();
+}
+
+// ── DATA FIELDS ──
+function confirmAddDF(phaseId, actId) {
+  const name = document.getElementById('adf-name-'+actId).value.trim();
+  if (!name) { document.getElementById('adf-name-'+actId).focus(); return; }
+  const type = document.getElementById('adf-type-'+actId).value;
+  const desc = document.getElementById('adf-desc-'+actId).value.trim();
+  const example = document.getElementById('adf-ex-'+actId).value.trim();
+  const pkTrack = document.getElementById('adf-pk-track-'+actId);
+  const isPK = pkTrack && pkTrack.dataset.pk === '1';
+  getAct(phaseId, actId).dataFields.push({ id:uid(), name, type, isPK, description:desc, example });
+  renderPhases(); renderSummary();
+  showToast('Campo agregado');
+}
+function deleteDataField(phaseId, actId, fieldId) {
+  const act = getAct(phaseId, actId);
+  act.dataFields = act.dataFields.filter(f=>f.id!==fieldId);
+  renderPhases(); renderSummary();
+  showToast('Campo eliminado');
+}
+
+// ── FIELD UPDATES ──
+function getAct(phaseId, actId) { return phases.find(p=>p.id===phaseId).activities.find(a=>a.id===actId); }
+function setField(phaseId, actId, field, val) { getAct(phaseId, actId)[field] = val; }
+function setSystems(phaseId, actId, val) { getAct(phaseId, actId).systems = val.split(',').map(s=>s.trim()).filter(Boolean); }
+function saveAct(phaseId, actId) {
+  document.getElementById('last-saved').textContent = 'Guardado: '+new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  renderPhases(); renderSummary(); renderDiagram();
+  showToast('Cambios guardados');
+}
+function deleteAct(phaseId, actId) {
+  if (!confirm('¿Eliminar esta actividad?')) return;
+  phases.find(p=>p.id===phaseId).activities = phases.find(p=>p.id===phaseId).activities.filter(a=>a.id!==actId);
+  renderPhases(); renderSummary(); renderDiagram();
+  showToast('Actividad eliminada');
+}
+function addActivity(phaseId) {
+  const phase = phases.find(p=>p.id===phaseId);
+  const newId = uid();
+  phase.activities.push({ id:newId, name:'Nueva actividad', source:'', sourceConnectedCelonis:false, systems:[], quantity:1, notes:'', casoDeUso:false, dataFields:[] });
+  renderPhases(); renderSummary();
+  setTimeout(()=>{ toggleCard(newId); document.getElementById('card-'+newId).scrollIntoView({behavior:'smooth',block:'center'}); },60);
+}
+
+// ── DIAGRAM ──
+function renderDiagram() {
+  const container = document.getElementById('d-phases');
+  container.innerHTML = '';
+  const allSys = new Set();
+  phases.forEach((phase, pi) => {
+    const vol = phase.activities.reduce((s,a)=>s+(a.quantity||0),0);
+    const col = document.createElement('div');
+    col.className = 'd-phase';
+    col.innerHTML = `
+      <div class="d-phase-head" style="background:${phase.color}18;border-top:3px solid ${phase.color}">
+        <div class="d-num" style="background:${phase.color}22;color:${phase.color}">${pi+1}</div>
+        <div class="d-name" style="color:${phase.color}">${phase.name}</div>
+        <div class="d-vol" style="color:${phase.color}">vol. ${vol}</div>
+      </div>`;
+    const acts = document.createElement('div');
+    acts.className = 'd-acts';
+    acts.style.cssText = `background:${phase.color}07;border:0.5px solid ${phase.color}30;border-top:none;border-radius:0 0 8px 8px;`;
+    phase.activities.forEach(act => {
+      act.systems.forEach(s=>allSys.add(s));
+      const card = document.createElement('div');
+      const isCelonis = act.sourceConnectedCelonis;
+      card.className = 'd-act' + (isCelonis?' celonis-on':'');
+      card.style.borderLeftColor = isCelonis ? '#1D9E75' : phase.color;
+      const sysBadges = act.systems.map(s=>`<span class="d-sys sys-${s}">${sysLabels[s]||s}</span>`).join('');
+      let dataFieldsHTML = '';
+      if (isCelonis && act.dataFields && act.dataFields.length) {
+        const rows = act.dataFields.map(df=>`
+          <div class="d-df-item">
+            <span class="d-df-label">${df.name}</span>
+            <span class="d-df-type-badge ${typeClass(df.type)}">${df.type}</span>
+            ${df.isPK?'<span class="d-df-pk-badge">PK</span>':''}
+            ${df.example?`<span class="d-df-example">→ ${df.example}</span>`:''}
+          </div>`).join('');
+        dataFieldsHTML = `<div class="d-data-fields">${rows}</div>`;
+      }
+      card.innerHTML = `
+        ${isCelonis?`<div class="celonis-header"><div class="celonis-dot"></div><span class="celonis-label">Celonis conectado</span></div>`:''}
+        <div class="d-act-qty" style="background:${phase.color}18;color:${phase.color}">${act.quantity}</div>
+        <div class="d-act-name">${act.name}</div>
+        <div class="d-act-src">${act.source}</div>
+        ${act.systems.length?`<div class="d-sys-row">${sysBadges}</div>`:''}
+        ${act.casoDeUso?`<div class="d-caso-tag">✓ Caso de uso</div>`:''}
+        ${dataFieldsHTML}`;
+      acts.appendChild(card);
+    });
+    col.appendChild(acts);
+    container.appendChild(col);
+    if (pi < phases.length-1) {
+      const arrow = document.createElement('div');
+      arrow.className = 'd-arrow';
+      arrow.innerHTML = `<div class="d-arrow-inner">→</div>`;
+      container.appendChild(arrow);
+    }
+  });
+  const legend = document.getElementById('d-legend');
+  legend.innerHTML = `
+    <div class="d-legend-title">Leyenda</div>
+    <div class="d-legend-item"><div class="d-legend-dot" style="background:#1D9E75"></div>Source conectado en Celonis</div>
+    <div class="d-legend-item"><div class="d-legend-dot" style="background:#7F77DD"></div>Entra para el caso de uso</div>
+    <div class="d-legend-item"><div class="d-legend-dot" style="background:#d3d1c7"></div>Sin conexión Celonis</div>
+    <div style="width:100%;border-top:0.5px solid #e8e6df;margin:6px 0"></div>
+    <div class="d-legend-title" style="margin-bottom:4px">Sistemas</div>
+    ${[...allSys].map(s=>`<span class="sys-badge sys-${s}">${sysLabels[s]||s}</span>`).join('')}`;
+}
+
+
+
+// ════════════════════════════════════
+// AI DESIGN SPRINT
+// ════════════════════════════════════
+const SD = {
+  meta: {
+    titulo: 'AI Design Sprint — PeopleOps Brasil',
+    subtitulo: 'Automatización del proceso de altas de empleados · Foco: Shipping',
+    stat1val: '+20.000', stat1label: 'Altas/mes en Brasil',
+    stat2val: '12 hs',   stat2label: '2 jornadas · 6 bloques',
+    stat3val: '3',       stat3label: 'Casos de uso a diseñar'
+  },
+  jornadas: [
+    { id:'j1', titulo:'Jornada 1 — Descubrimiento y definición', horas:'6 horas', bloques:[
+      { id:'b1', num:1, nombre:'Bienvenida, objetivos y reglas del "AI Use Case Discovery"', tiempo:'30 min', detalle:'Presentación del equipo, objetivos del sprint, metodología y reglas de trabajo. Se establece el contexto del caso en Brasil (Shipping) y se alinea al equipo sobre el alcance: +20.000 altas/mes, foco en automatización del proceso end-to-end.' },
+      { id:'b2', num:2, nombre:'Demo en Celonis de OTC 1P — "Daily questions"', tiempo:'45 min', detalle:'Demostración en vivo del caso de uso OTC 1P en Celonis como referencia de lo que se puede construir. Se muestran las capacidades de AI y automatización ya implementadas para que el equipo entienda el potencial de la herramienta aplicado a PeopleOps.' },
+      { id:'b3', num:3, nombre:'Pains y definiciones (para medir valor)', tiempo:'90 min', detalle:'Workshop de identificación de dolores del proceso actual. Se trabaja en grupos para mapear los pains principales. Para cada pain se define la métrica que permitirá medir el valor de la solución propuesta.' }
+    ]},
+    { id:'j2', titulo:'Jornada 2 — Diseño y priorización', horas:'6 horas', bloques:[
+      { id:'b4', num:4, nombre:'AI Hackatón en squads — Diseño de casos 1 a 3', tiempo:'150 min', detalle:'Los equipos se dividen en squads (uno por caso de uso) y diseñan en detalle su propuesta: flujo de la solución, sistemas involucrados, datos necesarios, métricas de éxito y estimación de valor. Cada squad presenta su caso en 10 minutos.' },
+      { id:'b5', num:5, nombre:'Priorización del caso de uso', tiempo:'60 min', detalle:'Votación y scoring de los 3 casos usando el framework de priorización: volumen de impacto, complejidad técnica, tiempo al valor, datos disponibles en Celonis y dependencias externas. Se elige el caso ganador por consenso.' },
+      { id:'b6', num:6, nombre:'Plan del caso ganador y Cierre', tiempo:'45 min', detalle:'Definición del roadmap de implementación del caso seleccionado: owner, equipo, próximos pasos con fechas y métricas de seguimiento. Cierre del sprint con acuerdos y compromisos del equipo.' }
+    ]}
+  ],
+  pains: [
+    { id:'p1', titulo:'Datos del candidato fuera de Jira (Shipping)', sev:'alto', desc:'El ticket Jira generado por el bot de ABM solo contiene un link a un Google Sheet. Los datos del candidato no están en campos de Jira sino dentro del archivo enlazado. El equipo debe copiar manualmente cada campo del Google Sheet para cargar en Saxes.', impacto:'Tiempo manual por alta × +20.000 altas/mes en Brasil' },
+    { id:'p2', titulo:'Carga masiva de 13 portlets con validaciones que fallan', sev:'alto', desc:'Saxes realiza validaciones automáticas durante la carga masiva (ej: dirección demasiado larga). Cualquier error detiene todo el proceso. El equipo debe identificar el error, notificar al TA por chat y marcar el ticket como PENDING con nota.', impacto:'Reprocesos y demoras → riesgo de no llegar a la fecha de ingreso' },
+    { id:'p3', titulo:'Rehire: manipulación manual del CPF', sev:'alto', desc:'El sistema no permite recontratar directamente. El equipo modifica el CPF en Saxes para forzar una nueva contratación, rompiendo la trazabilidad del documento y la réplica hacia SAP.', impacto:'Errores de integridad de datos + riesgo regulatorio' },
+    { id:'p4', titulo:'Ambigüedad en la posición de Único en el flujo', sev:'medio', desc:'En el proceso estándar Único va después de Saxes, pero en Meliclick la validación de docs y creación en Único pueden ocurrir simultáneamente. Esta ambigüedad genera errores de secuencia y reprocesos.', impacto:'Errores de secuencia → reprocesos → demoras en alta' },
+    { id:'p5', titulo:'isulog manual: historial de información faltante', sev:'medio', desc:'Existe un isulog que detalla nro de ticket, dato faltante y TA responsable. Se construye y actualiza de forma manual y no está integrado a ningún sistema.', impacto:'Tiempo de construcción manual + riesgo de pérdida de información' }
+  ],
+  casos: [
+    { id:'c1', bc:'caso-c1', lbl:'C1', titulo:'Extracción automática de datos desde Google Sheet vía Celonis',
+      desc:'Automatizar la lectura y descomposición de los campos del Google Sheet enlazado en el ticket Jira, para alimentar directamente la carga en Saxes sin intervención manual.',
+      sistemas:'Jira, Google Sheets, Saxes, Celonis',
+      palanca:'El Google Sheet tiene estructura consistente para todas las solicitudes en Brasil — técnicamente factible usar Celonis para abrir y descomponer los campos del archivo para procesamiento masivo.',
+      valor:'Eliminación del trabajo manual de copia de datos · Reducción de errores de tipeo · Tiempo ahorrado: N min × 20.000 altas/mes',
+      complejidad:'Media', tiempo:'Corto',
+      metrica:'% de altas procesadas sin intervención manual / Tiempo promedio de procesamiento por alta' },
+    { id:'c2', bc:'caso-c2', lbl:'C2', titulo:'Detección y resolución asistida de errores de validación en Saxes',
+      desc:'AI que detecta el tipo de error de validación en Saxes, identifica el campo problemático, sugiere la corrección al equipo y notifica automáticamente al TA — reemplazando el proceso manual del isulog.',
+      sistemas:'Saxes, Jira, Celonis, Único',
+      palanca:'El isulog existente es un dataset de entrenamiento natural: contiene el historial de errores con nro de ticket, tipo de error y TA responsable.',
+      valor:'Reducción del tiempo de reproceso · Eliminación del isulog manual · Notificación automática al TA',
+      complejidad:'Media-Alta', tiempo:'Medio',
+      metrica:'Tiempo de resolución de errores antes vs. después / % de tickets que pasaron por PENDING' },
+    { id:'c3', bc:'caso-c3', lbl:'C3', titulo:'Asistente de alta para el TA (bot conversacional)',
+      desc:'AI conversacional que guía al TA durante la solicitud de alta, valida en tiempo real que todos los datos requeridos estén completos y correctos antes de crear el ticket Jira.',
+      sistemas:'Jira, Celonis, Único, SSFF',
+      palanca:'El bot de ABM ya existe como punto de entrada del proceso. La AI puede enriquecer el bot actual con validación inteligente de datos antes de crear el ticket.',
+      valor:'Reducción de tickets PENDING por datos faltantes · Mayor calidad del dato desde el origen · Menos reprocesos downstream',
+      complejidad:'Media', tiempo:'Medio',
+      metrica:'% de tickets que llegan a PENDING / Tasa de altas procesadas sin error en primer intento' }
+  ]
+};
+
+function uidS() { return 's'+Date.now()+Math.floor(Math.random()*9999); }
+
+function renderSprint() {
+  const wrap = document.getElementById('sprint-content');
+  if (!wrap) return;
+  wrap.dataset.rendered = '1';
+  rebuildSprint(wrap);
+}
+
+function rebuildSprint(wrap) {
+  wrap.innerHTML =
+    buildSprintToolbar() +
+    buildSprintHero() +
+    buildSprintSection('📅 Agenda del sprint', 'sprintAddBloque()', buildBloques()) +
+    buildSprintSection('⚠️ Pains identificados', 'sprintAddPain()', buildPains()) +
+    buildSprintSection('💡 Casos de uso para el Hackatón', 'sprintAddCaso()', buildCasos()) +
+    buildSprintSection('📊 Framework de priorización', '', buildPrioTable());
+}
+
+function buildSprintToolbar() {
+  return `<div class="sprint-toolbar">
+    <button class="sprint-btn" onclick="sprintCopyAll()">📋 Copiar contenido</button>
+    <button class="sprint-btn sprint-btn-primary" onclick="window.print()">🖨️ Imprimir / PDF</button>
+  </div>`;
+}
+
+function buildSprintHero() {
+  return `<div class="sprint-hero">
+    <div class="sprint-edit-field" style="margin-bottom:8px">
+      <label style="color:#888780">Título</label>
+      <input style="font-size:15px;font-weight:500;background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.15);border-radius:6px;padding:6px 10px;font-family:inherit;width:100%" value="${SD.meta.titulo}" oninput="SD.meta.titulo=this.value">
+    </div>
+    <div class="sprint-edit-field" style="margin-bottom:14px">
+      <label style="color:#888780">Descripción</label>
+      <input style="font-size:12px;background:rgba(255,255,255,.08);color:#b4b2a9;border-color:rgba(255,255,255,.1);border-radius:6px;padding:5px 10px;font-family:inherit;width:100%" value="${SD.meta.subtitulo}" oninput="SD.meta.subtitulo=this.value">
+    </div>
+    <div class="sprint-hero-stats">
+      ${['1','2','3'].map(n => `<div class="sprint-stat">
+        <input style="font-size:18px;font-weight:500;color:#fff;background:none;border:none;border-bottom:0.5px solid rgba(255,255,255,.2);width:100%;padding:0;font-family:inherit" value="${SD.meta['stat'+n+'val']}" oninput="SD.meta['stat${n}val']=this.value">
+        <input style="font-size:10px;color:#888780;background:none;border:none;width:100%;padding:0;margin-top:4px;font-family:inherit" value="${SD.meta['stat'+n+'label']}" oninput="SD.meta['stat${n}label']=this.value">
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function buildSprintSection(title, addFn, body) {
+  return `<div class="sprint-section">
+    <div class="sprint-section-header">
+      <div class="sprint-section-title">${title}</div>
+      ${addFn ? `<button class="sprint-add-btn" onclick="${addFn}">+ Agregar</button>` : ''}
+    </div>
+    ${body}
+  </div>`;
+}
+
+function buildBloques() {
+  return SD.jornadas.map(j => `
+    <div class="sprint-jornada">
+      <div class="sprint-jornada-title-row">
+        <input style="font-size:12px;font-weight:500;color:#2c2c2a;background:none;border:none;border-bottom:0.5px solid #d3d1c7;flex:1;font-family:inherit;padding:2px 0" value="${j.titulo}" oninput="j.titulo=this.value">
+        <input style="font-size:10px;color:#5f5e5a;background:#f1efe8;border:0.5px solid #d3d1c7;border-radius:99px;padding:2px 8px;width:64px;font-family:inherit;text-align:center;margin-left:8px" value="${j.horas}" oninput="j.horas=this.value">
+      </div>
+      ${j.bloques.map(b => `
+        <div class="sprint-bloque" id="blq-${b.id}">
+          <div class="sprint-bloque-head" onclick="toggleSB('${b.id}')">
+            <div class="sprint-bloque-num">${b.num}</div>
+            <div class="sprint-bloque-body-wrap">
+              <div class="sprint-bloque-name-view" id="bn-${b.id}">${b.nombre}</div>
+              <div class="sprint-bloque-time-view" id="bt-${b.id}">${b.tiempo}</div>
+            </div>
+            <div class="sprint-bloque-tog" id="tog-${b.id}">▾</div>
+          </div>
+          <div class="sprint-bloque-detail" id="det-${b.id}">
+            <div class="sprint-edit-field" style="margin-top:10px">
+              <label>Nombre del bloque</label>
+              <input value="${b.nombre}" oninput="b.nombre=this.value;document.getElementById('bn-${b.id}').textContent=this.value">
+            </div>
+            <div class="sprint-edit-field">
+              <label>Duración</label>
+              <input value="${b.tiempo}" style="max-width:120px" oninput="b.tiempo=this.value;document.getElementById('bt-${b.id}').textContent=this.value">
+            </div>
+            <div class="sprint-edit-field">
+              <label>Detalle / descripción</label>
+              <textarea rows="3" oninput="b.detalle=this.value">${b.detalle}</textarea>
+            </div>
+            <button class="sprint-del-btn" onclick="sprintDelBloque('${j.id}','${b.id}')">✕ Eliminar bloque</button>
+          </div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+function buildPains() {
+  return SD.pains.map(p => `
+    <div class="pain-card" id="pain-${p.id}" style="border-left-color:${p.sev==='alto'?'#d85a30':p.sev==='medio'?'#BA7517':'#1D9E75'}">
+      <div class="pain-header">
+        <input style="font-size:13px;font-weight:500;color:#2c2c2a;background:none;border:none;border-bottom:0.5px solid #d3d1c7;flex:1;font-family:inherit;padding:2px 0" value="${p.titulo}" oninput="p.titulo=this.value">
+        <select class="pain-severity-sel" onchange="p.sev=this.value;document.getElementById('pain-${p.id}').style.borderLeftColor=this.value==='alto'?'#d85a30':this.value==='medio'?'#BA7517':'#1D9E75'">
+          <option value="alto" ${p.sev==='alto'?'selected':''}>Alto</option>
+          <option value="medio" ${p.sev==='medio'?'selected':''}>Medio</option>
+          <option value="bajo" ${p.sev==='bajo'?'selected':''}>Bajo</option>
+        </select>
+      </div>
+      <div class="sprint-edit-field" style="margin-bottom:8px">
+        <label>Descripción</label>
+        <textarea rows="2" style="font-size:12px;padding:6px 8px;border-radius:6px;border:0.5px solid #d3d1c7;background:#f5f4f0;color:#5f5e5a;font-family:inherit;resize:vertical;width:100%" oninput="p.desc=this.value">${p.desc}</textarea>
+      </div>
+      <div class="sprint-edit-field">
+        <label>Impacto estimado</label>
+        <input style="font-size:11px;padding:5px 8px;border-radius:6px;border:0.5px solid #d3d1c7;background:#f5f4f0;color:#888780;font-family:inherit;width:100%" value="${p.impacto}" oninput="p.impacto=this.value">
+      </div>
+      <button class="sprint-del-btn" onclick="sprintDelPain('${p.id}')">✕ Eliminar pain</button>
+    </div>`).join('');
+}
+
+function buildCasos() {
+  return SD.casos.map(c => `
+    <div class="caso-card" id="caso-${c.id}">
+      <div class="caso-header-row" onclick="toggleCasoSprint('${c.id}')">
+        <div class="caso-num-badge ${c.bc}">${c.lbl}</div>
+        <div class="caso-title-text" id="ctitle-${c.id}">${c.titulo}</div>
+        <div class="caso-tog" id="ctog-${c.id}">▾</div>
+      </div>
+      <div class="caso-body" id="cbody-${c.id}">
+        <div class="sprint-edit-field"><label>Título</label>
+          <input value="${c.titulo}" oninput="c.titulo=this.value;document.getElementById('ctitle-${c.id}').textContent=this.value"></div>
+        <div class="sprint-edit-field"><label>Descripción</label>
+          <textarea rows="2" oninput="c.desc=this.value">${c.desc}</textarea></div>
+        <div class="sprint-edit-field"><label>Sistemas involucrados</label>
+          <input value="${c.sistemas}" oninput="c.sistemas=this.value"></div>
+        <div class="sprint-edit-field"><label>Palanca técnica</label>
+          <textarea rows="2" oninput="c.palanca=this.value">${c.palanca}</textarea></div>
+        <div class="sprint-edit-field"><label>Valor esperado</label>
+          <textarea rows="2" oninput="c.valor=this.value">${c.valor}</textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="sprint-edit-field"><label>Complejidad</label>
+            <input value="${c.complejidad}" oninput="c.complejidad=this.value;refreshPrioTable()"></div>
+          <div class="sprint-edit-field"><label>Tiempo al valor</label>
+            <input value="${c.tiempo}" oninput="c.tiempo=this.value;refreshPrioTable()"></div>
+        </div>
+        <div class="sprint-edit-field"><label>Métrica de éxito</label>
+          <input value="${c.metrica}" oninput="c.metrica=this.value">
+          <span class="caso-metrica-pill">${c.metrica}</span>
+        </div>
+        <button class="sprint-del-btn" onclick="sprintDelCaso('${c.id}')">✕ Eliminar caso</button>
+      </div>
+    </div>`).join('');
+}
+
+function buildPrioTable() {
+  const dc = v => v==='Corto'||v==='Baja'||v==='Bajo'?'dot-g':v==='Media-Alta'||v==='Alto'||v==='Larga'?'dot-r':'dot-y';
+  const rows = SD.casos.map(c=>`<tr>
+    <td><strong>${c.lbl}</strong> — ${c.titulo.substring(0,36)}${c.titulo.length>36?'...':''}</td>
+    <td><span class="prio-dot dot-g"></span>Alto</td>
+    <td><span class="prio-dot ${dc(c.complejidad)}"></span>${c.complejidad}</td>
+    <td><span class="prio-dot ${dc(c.tiempo)}"></span>${c.tiempo}</td>
+    <td>Sí</td>
+  </tr>`).join('');
+  return `<table class="prio-table" id="prio-tbl">
+    <thead><tr><th>Caso</th><th>Impacto</th><th>Complejidad</th><th>Tiempo al valor</th><th>Datos Celonis</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function refreshPrioTable() {
+  const el = document.getElementById('prio-tbl');
+  if (el) el.outerHTML = buildPrioTable();
+}
+
+// Toggles
+function toggleSB(id) { document.getElementById('det-'+id).classList.toggle('open'); document.getElementById('tog-'+id).classList.toggle('open'); }
+function toggleCasoSprint(id) { document.getElementById('cbody-'+id).classList.toggle('open'); document.getElementById('ctog-'+id).classList.toggle('open'); }
+
+// Add/delete
+function sprintAddBloque() {
+  const j = SD.jornadas[SD.jornadas.length-1];
+  const n = SD.jornadas.reduce((s,jj)=>s+jj.bloques.length,0)+1;
+  j.bloques.push({ id:uidS(), num:n, nombre:'Nuevo bloque', tiempo:'30 min', detalle:'' });
+  document.getElementById('sprint-content').innerHTML = '';
+  document.getElementById('sprint-content').dataset.rendered = '';
+  renderSprint();
+}
+function sprintDelBloque(jid, bid) {
+  SD.jornadas.find(j=>j.id===jid).bloques = SD.jornadas.find(j=>j.id===jid).bloques.filter(b=>b.id!==bid);
+  document.getElementById('sprint-content').innerHTML = '';
+  document.getElementById('sprint-content').dataset.rendered = '';
+  renderSprint();
+}
+function sprintAddPain() {
+  SD.pains.push({ id:uidS(), titulo:'Nuevo pain', sev:'medio', desc:'', impacto:'' });
+  document.getElementById('sprint-content').innerHTML = '';
+  document.getElementById('sprint-content').dataset.rendered = '';
+  renderSprint();
+}
+function sprintDelPain(id) {
+  SD.pains = SD.pains.filter(p=>p.id!==id);
+  document.getElementById('sprint-content').innerHTML = '';
+  document.getElementById('sprint-content').dataset.rendered = '';
+  renderSprint();
+}
+function sprintAddCaso() {
+  const bcs = ['caso-c1','caso-c2','caso-c3'];
+  const n = SD.casos.length;
+  SD.casos.push({ id:uidS(), bc:bcs[n%3], lbl:'C'+(n+1), titulo:'Nuevo caso de uso', desc:'', sistemas:'', palanca:'', valor:'', complejidad:'Media', tiempo:'Medio', metrica:'' });
+  document.getElementById('sprint-content').innerHTML = '';
+  document.getElementById('sprint-content').dataset.rendered = '';
+  renderSprint();
+}
+function sprintDelCaso(id) {
+  SD.casos = SD.casos.filter(c=>c.id!==id);
+  document.getElementById('sprint-content').innerHTML = '';
+  document.getElementById('sprint-content').dataset.rendered = '';
+  renderSprint();
+}
+
+// Copy
+function sprintCopyAll() {
+  const lines = [SD.meta.titulo, SD.meta.subtitulo, ''];
+  lines.push('AGENDA');
+  SD.jornadas.forEach(j => {
+    lines.push(j.titulo + ' (' + j.horas + ')');
+    j.bloques.forEach(b => lines.push('  ' + b.num + '. ' + b.nombre + ' — ' + b.tiempo + '\n     ' + b.detalle));
+  });
+  lines.push('\nPAINS');
+  SD.pains.forEach(p => lines.push('• [' + p.sev.toUpperCase() + '] ' + p.titulo + '\n  ' + p.desc + '\n  Impacto: ' + p.impacto));
+  lines.push('\nCASOS DE USO');
+  SD.casos.forEach(c => { lines.push(c.lbl + '. ' + c.titulo); lines.push('   Desc: '+c.desc); lines.push('   Sistemas: '+c.sistemas); lines.push('   Palanca: '+c.palanca); lines.push('   Valor: '+c.valor); lines.push('   Complejidad: '+c.complejidad+' | Tiempo: '+c.tiempo); lines.push('   Metrica: '+c.metrica+''); });
+  navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('Contenido copiado al portapapeles'));
+}
+
+function renderAll() { renderSummary(); renderPhases(); renderDiagram(); }
+document.addEventListener('DOMContentLoaded', renderAll);
+
+</script>
+</body>
+</html>
